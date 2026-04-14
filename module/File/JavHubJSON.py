@@ -28,8 +28,6 @@ class JavHubJSON(Base):
 
         # 初始化
         self.config = config
-        self.source_language: BaseLanguage.Enum = config.source_language
-        self.target_language: BaseLanguage.Enum = config.target_language
 
     # 读取
     def read_from_path(self, abs_paths: list[str], input_path: str) -> list[Item]:
@@ -106,7 +104,8 @@ class JavHubJSON(Base):
     # 写入
     def write_to_path(self, items: list[Item]) -> None:
         # 获取输出目录
-        output_path = DataManager.get().get_translated_path()
+        dm = DataManager.get()
+        output_path = dm.get_translated_path()
 
         target = [
             item for item in items if item.get_file_type() == Item.FileType.JAVHUBJSON
@@ -120,42 +119,26 @@ class JavHubJSON(Base):
             # 按行号排序
             sorted_items = sorted(group_items, key=lambda x: x.get_row())
 
-            # 读取原始文件以保留未翻译条目
-            # 原始文件在项目目录（与 .lg 文件同目录）
-            lg_path = DataManager.get().require_loaded_lg_path()
-            lg_dir = os.path.dirname(lg_path)
-            original_abs_path = os.path.join(lg_dir, rel_path)
+            # 从数据库读取原始文件（assets 表）
+            raw_content = dm.get_asset_decompressed(rel_path)
 
-            original_data: dict = {}
-            if os.path.exists(original_abs_path):
-                with open(original_abs_path, "rb") as reader:
-                    enc_bytes = reader.read()
-                encoding = TextHelper.get_encoding(content=enc_bytes, add_sig_to_utf8=True)
-                original_data = JSONTool.loads(
-                    enc_bytes if encoding.lower() in ("utf-8", "utf-8-sig") else enc_bytes.decode(encoding)
-                )
-            else:
-                # 原始文件不存在，尝试输出目录
-                output_abs_path = os.path.join(output_path, rel_path)
-                if os.path.exists(output_abs_path):
-                    with open(output_abs_path, "rb") as reader:
-                        enc_bytes = reader.read()
-                    encoding = TextHelper.get_encoding(content=enc_bytes, add_sig_to_utf8=True)
-                    original_data = JSONTool.loads(
-                        enc_bytes if encoding.lower() in ("utf-8", "utf-8-sig") else enc_bytes.decode(encoding)
-                    )
+            if raw_content is None:
+                continue
+
+            # 解析原始 JSON
+            encoding = TextHelper.get_encoding(content=raw_content, add_sig_to_utf8=True)
+            enc_str = raw_content if encoding.lower() in ("utf-8", "utf-8-sig") else raw_content.decode(encoding)
+            original_data = JSONTool.loads(enc_str)
 
             # 用 src (name_kanji) 匹配原文并更新翻译
-            result = dict(original_data)
             for item in sorted_items:
                 src = item.get_src()
                 dst = item.get_effective_dst()
-                # 遍历原始数据，用 name_kanji 匹配
-                for entry_id, entry in result.items():
+                for entry_id, entry in original_data.items():
                     if isinstance(entry, dict) and entry.get("name_kanji") == src:
                         entry["name_translated"] = dst
 
             # 写入输出目录
             abs_path = os.path.join(output_path, rel_path)
             os.makedirs(os.path.dirname(abs_path), exist_ok=True)
-            JSONTool.save_file(abs_path, result, indent=4)
+            JSONTool.save_file(abs_path, original_data, indent=4)
