@@ -73,12 +73,6 @@ class JavHubJSON(Base):
             if not name_kanji:
                 continue
 
-            # extra_field 存储完整条目，用于回写时重建
-            extra_field = {
-                "id": entry_id,
-                "entry": entry,
-            }
-
             # 判断是否已翻译
             if name_translated and name_translated != name_kanji:
                 items.append(
@@ -86,7 +80,6 @@ class JavHubJSON(Base):
                         {
                             "src": name_kanji,
                             "dst": name_translated,
-                            "extra_field": extra_field,
                             "row": len(items),
                             "file_type": Item.FileType.JAVHUBJSON,
                             "file_path": rel_path,
@@ -100,7 +93,6 @@ class JavHubJSON(Base):
                         {
                             "src": name_kanji,
                             "dst": "",
-                            "extra_field": extra_field,
                             "row": len(items),
                             "file_type": Item.FileType.JAVHUBJSON,
                             "file_path": rel_path,
@@ -129,23 +121,41 @@ class JavHubJSON(Base):
             sorted_items = sorted(group_items, key=lambda x: x.get_row())
 
             # 读取原始文件以保留未翻译条目
-            abs_path = os.path.join(output_path, rel_path)
-            original_data: dict = {}
-            if os.path.exists(abs_path):
-                with open(abs_path, "rb") as reader:
-                    encoding = TextHelper.get_encoding(content=reader.read(), add_sig_to_utf8=True)
-                    with open(abs_path, "r", encoding=encoding if encoding.lower() not in ("utf-8", "utf-8-sig") else "utf-8") as f:
-                        original_data = JSONTool.loads(f.read())
+            # 原始文件在项目目录（与 .lg 文件同目录）
+            lg_path = DataManager.get().require_loaded_lg_path()
+            lg_dir = os.path.dirname(lg_path)
+            original_abs_path = os.path.join(lg_dir, rel_path)
 
-            # 更新翻译结果
+            original_data: dict = {}
+            if os.path.exists(original_abs_path):
+                with open(original_abs_path, "rb") as reader:
+                    enc_bytes = reader.read()
+                encoding = TextHelper.get_encoding(content=enc_bytes, add_sig_to_utf8=True)
+                original_data = JSONTool.loads(
+                    enc_bytes if encoding.lower() in ("utf-8", "utf-8-sig") else enc_bytes.decode(encoding)
+                )
+            else:
+                # 原始文件不存在，尝试输出目录
+                output_abs_path = os.path.join(output_path, rel_path)
+                if os.path.exists(output_abs_path):
+                    with open(output_abs_path, "rb") as reader:
+                        enc_bytes = reader.read()
+                    encoding = TextHelper.get_encoding(content=enc_bytes, add_sig_to_utf8=True)
+                    original_data = JSONTool.loads(
+                        enc_bytes if encoding.lower() in ("utf-8", "utf-8-sig") else enc_bytes.decode(encoding)
+                    )
+
+            # 用 src (name_kanji) 匹配原文并更新翻译
             result = dict(original_data)
             for item in sorted_items:
-                extra = item.get_extra_field()
-                if isinstance(extra, dict):
-                    entry_id = extra.get("id")
-                    if entry_id and entry_id in result:
-                        result[entry_id]["name_translated"] = item.get_effective_dst()
+                src = item.get_src()
+                dst = item.get_effective_dst()
+                # 遍历原始数据，用 name_kanji 匹配
+                for entry_id, entry in result.items():
+                    if isinstance(entry, dict) and entry.get("name_kanji") == src:
+                        entry["name_translated"] = dst
 
-            # 写入文件
+            # 写入输出目录
+            abs_path = os.path.join(output_path, rel_path)
             os.makedirs(os.path.dirname(abs_path), exist_ok=True)
             JSONTool.save_file(abs_path, result, indent=4)
