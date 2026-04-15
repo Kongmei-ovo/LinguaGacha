@@ -23,6 +23,9 @@ dependencies = [
     "lxml",
     "beautifulsoup4",
     "charset-normalizer",
+
+    # Compression
+    "zstandard",
 ]
 
 [project.optional-dependencies]

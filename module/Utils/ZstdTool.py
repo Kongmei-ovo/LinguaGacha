@@ -1,4 +1,4 @@
-import compression.zstd
+import zstandard
 from pathlib import Path
 
 
@@ -11,12 +11,12 @@ class ZstdTool:
     @classmethod
     def compress(cls, data: bytes) -> bytes:
         """压缩数据"""
-        return compression.zstd.compress(data, level=cls.COMPRESSION_LEVEL)
+        return zstandard.compress(data, level=cls.COMPRESSION_LEVEL)
 
     @classmethod
     def decompress(cls, data: bytes) -> bytes:
         """解压数据"""
-        return compression.zstd.decompress(data)
+        return zstandard.decompress(data)
 
     @classmethod
     def compress_file(cls, file_path: str) -> tuple[bytes, int]:

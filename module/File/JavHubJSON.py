@@ -1,6 +1,7 @@
 import os
 
 from base.Base import Base
+from base.LogManager import LogManager
 from model.Item import Item
 from module.Config import Config
 from module.Data.DataManager import DataManager
@@ -123,6 +124,10 @@ class JavHubJSON(Base):
             raw_content = dm.get_asset_decompressed(rel_path)
 
             if raw_content is None:
+                LogManager.get().error(
+                    f"[JavHubJSON] 无法获取资产内容: {rel_path}，跳过导出",
+                    None
+                )
                 continue
 
             # 解析原始 JSON
@@ -140,5 +145,7 @@ class JavHubJSON(Base):
 
             # 写入输出目录
             abs_path = os.path.join(output_path, rel_path)
-            os.makedirs(os.path.dirname(abs_path), exist_ok=True)
+            dir_name = os.path.dirname(abs_path)
+            if dir_name:
+                os.makedirs(dir_name, exist_ok=True)
             JSONTool.save_file(abs_path, original_data, indent=4)

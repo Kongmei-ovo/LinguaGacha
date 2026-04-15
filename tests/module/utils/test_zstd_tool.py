@@ -1,4 +1,4 @@
-import compression.zstd
+import zstandard
 from pathlib import Path
 
 import pytest
@@ -43,5 +43,5 @@ def test_compress_file_and_decompress_to_file_supports_empty_file(fs) -> None:
 
 
 def test_decompress_invalid_data_raises_zstd_error() -> None:
-    with pytest.raises(compression.zstd.ZstdError):
+    with pytest.raises(zstandard.ZstdError):
         ZstdTool.decompress(b"not-a-zstd-payload")
