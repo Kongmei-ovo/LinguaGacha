@@ -77,6 +77,12 @@
 - 具体示例可见 [Wiki - 支持的文件格式](https://github.com/neavo/LinguaGacha/wiki/%E6%94%AF%E6%8C%81%E7%9A%84%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F)，更多格式将持续添加，你也可以在 [ISSUES](https://github.com/neavo/LinguaGacha/issues) 中提出你的需求
 
 ## 近期更新 📅
+- 20260416 v0.60.1-javhub (Kongmei-ovo Fork)
+  - 新增 `.javhub.json` 文件格式支持
+  - 支持自描述格式：`_src/_dst/data` 字段映射配置，可自定义原文/译文字段名和数据容器
+  - 修复 `zstandard` 压缩依赖问题
+  - 详细设计思路：https://github.com/Kongmei-ovo/LinguaGacha/wiki/JavHubJSON-Design
+
 - 20260320 v0.60.1
   - 优化与改进 #465 #476 #477 #481
 
