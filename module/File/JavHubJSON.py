@@ -10,19 +10,31 @@ from module.Utils.JSONTool import JSONTool
 
 
 class JavHubJSON(Base):
-    # JavHub 导出文件格式:
+    # JavHub JSON 支持两种格式:
+    #
+    # 格式1 (旧版, 无头部):
     # {
     #     "1071692": {
-    #         "id": 1071692,
     #         "name_kanji": "松尾理恵",
-    #         "name_romaji": "Rie Matsuo",
-    #         "name_kana": "まつおりえ",
-    #         "name_translated": "松尾理恵-翻译V2"
-    #     },
-    #     ...
+    #         "name_translated": ""
+    #     }
     # }
     #
-    # 翻译字段: name_kanji -> name_translated
+    # 格式2 (新版, 自描述头部):
+    # {
+    #     "_type": "category",
+    #     "_version": "2",
+    #     "_src": "name_ja",
+    #     "_dst": "name_translated",
+    #     "data": {
+    #         "79015": { "name_ja": "4K", "name_translated": "" }
+    #     }
+    # }
+    #
+    # 字段说明:
+    #   _src: 原文字段名 (默认 name_kanji)
+    #   _dst: 译文字段名 (默认 name_translated)
+    #   data: 数据容器 key (默认无容器，直接遍历顶层)
 
     def __init__(self, config: Config) -> None:
         super().__init__()
@@ -60,25 +72,36 @@ class JavHubJSON(Base):
         if not isinstance(json_data, dict):
             return items
 
+        # 解析字段映射配置
+        src_field = json_data.get("_src", "name_kanji")
+        dst_field = json_data.get("_dst", "name_translated")
+        data_key = json_data.get("data")  # None 表示无容器，直接遍历顶层
+
+        # 确定数据容器
+        if data_key is not None and isinstance(data_key, dict):
+            entries = data_key
+        else:
+            entries = json_data
+
         # 读取数据: 遍历每个 ID 条目
-        for entry_id, entry in json_data.items():
+        for entry_id, entry in entries.items():
             if not isinstance(entry, dict):
                 continue
 
-            name_kanji = entry.get("name_kanji", "")
-            name_translated = entry.get("name_translated", "")
+            src = entry.get(src_field, "")
+            dst = entry.get(dst_field, "")
 
-            # name_kanji 为空则跳过
-            if not name_kanji:
+            # src 为空则跳过
+            if not src:
                 continue
 
             # 判断是否已翻译
-            if name_translated and name_translated != name_kanji:
+            if dst and dst != src:
                 items.append(
                     Item.from_dict(
                         {
-                            "src": name_kanji,
-                            "dst": name_translated,
+                            "src": src,
+                            "dst": dst,
                             "row": len(items),
                             "file_type": Item.FileType.JAVHUBJSON,
                             "file_path": rel_path,
@@ -90,7 +113,7 @@ class JavHubJSON(Base):
                 items.append(
                     Item.from_dict(
                         {
-                            "src": name_kanji,
+                            "src": src,
                             "dst": "",
                             "row": len(items),
                             "file_type": Item.FileType.JAVHUBJSON,
@@ -135,13 +158,27 @@ class JavHubJSON(Base):
             enc_str = raw_content if encoding.lower() in ("utf-8", "utf-8-sig") else raw_content.decode(encoding)
             original_data = JSONTool.loads(enc_str)
 
-            # 用 src (name_kanji) 匹配原文并更新翻译
+            if not isinstance(original_data, dict):
+                continue
+
+            # 解析字段映射配置
+            src_field = original_data.get("_src", "name_kanji")
+            dst_field = original_data.get("_dst", "name_translated")
+            data_key = original_data.get("data")
+
+            # 确定数据容器
+            if data_key is not None and isinstance(data_key, dict):
+                entries = data_key
+            else:
+                entries = original_data
+
+            # 用 src 匹配原文并更新翻译
             for item in sorted_items:
                 src = item.get_src()
                 dst = item.get_effective_dst()
-                for entry_id, entry in original_data.items():
-                    if isinstance(entry, dict) and entry.get("name_kanji") == src:
-                        entry["name_translated"] = dst
+                for entry_id, entry in entries.items():
+                    if isinstance(entry, dict) and entry.get(src_field) == src:
+                        entry[dst_field] = dst
 
             # 写入输出目录
             abs_path = os.path.join(output_path, rel_path)
