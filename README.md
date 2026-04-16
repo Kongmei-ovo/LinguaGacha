@@ -81,7 +81,22 @@
   - 新增 `.javhub.json` 文件格式支持
   - 支持自描述格式：`_src/_dst/data` 字段映射配置，可自定义原文/译文字段名和数据容器
   - 修复 `zstandard` 压缩依赖问题
-  - 自描述格式设计：文件头部定义 `_src/_dst/data` 字段映射，灵活适配不同 JSON 结构
+
+  自描述格式示例：
+  ```json
+  {
+    "_src": "name_ja",
+    "_dst": "name_translated",
+    "data": {
+      "79015": { "name_ja": "4K", "name_en": "4K", "name_translated": "" },
+      "5031": { "name_ja": "シックスナイン", "name_en": "69", "name_translated": "" }
+    }
+  }
+  ```
+  字段说明：
+  - `_src`: 原文字段名
+  - `_dst`: 译文字段名
+  - `data`: 数据容器（不填则直接遍历顶层）
 
 - 20260320 v0.60.1
   - 优化与改进 #465 #476 #477 #481
